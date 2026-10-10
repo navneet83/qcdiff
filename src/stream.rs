@@ -102,6 +102,21 @@ fn exprs_str(exprs: &[asg::TExpr], table: &SymbolTable) -> String {
         .join(",")
 }
 
+/// Render each qubit expression and record it in the referenced-qubit set, so
+/// programs on physical qubits (`$0`), which declare nothing, still report a
+/// qubit count.
+fn exprs_str_tracked(
+    exprs: &[asg::TExpr],
+    table: &SymbolTable,
+    referenced: &mut std::collections::BTreeSet<String>,
+) -> String {
+    let rendered: Vec<String> = exprs.iter().map(|e| expr_str(e, table)).collect();
+    for q in &rendered {
+        referenced.insert(q.clone());
+    }
+    rendered.join(",")
+}
+
 /// Canonical, whitespace-free rendering of an expression. Falls back to a
 /// stable content hash for constructs v0 does not render; the hash keeps the
 /// diff deterministic without pretending to pretty-print them.
@@ -217,10 +232,15 @@ fn bit_width(ty: &Type) -> usize {
 pub fn extract(program: &asg::Program, table: &SymbolTable) -> Extracted {
     let mut ops = Vec::new();
     let mut summary = Summary::default();
+    let mut referenced = std::collections::BTreeSet::new();
 
     for stmt in program.stmts() {
-        extract_stmt(stmt, table, &mut ops, &mut summary);
+        extract_stmt(stmt, table, &mut ops, &mut summary, &mut referenced);
     }
+
+    // Physical-qubit programs (post-transpile `$n` operands) declare no
+    // qubits; the distinct referenced operands are the honest count then.
+    summary.qubits = summary.qubits.max(referenced.len());
 
     summary.total_ops = ops.len();
     summary.two_qubit_gates = ops
@@ -230,7 +250,13 @@ pub fn extract(program: &asg::Program, table: &SymbolTable) -> Extracted {
     Extracted { ops, summary }
 }
 
-fn extract_stmt(stmt: &asg::Stmt, table: &SymbolTable, ops: &mut Vec<Op>, summary: &mut Summary) {
+fn extract_stmt(
+    stmt: &asg::Stmt,
+    table: &SymbolTable,
+    ops: &mut Vec<Op>,
+    summary: &mut Summary,
+    referenced: &mut std::collections::BTreeSet<String>,
+) {
     use asg::Stmt;
     match stmt {
         Stmt::GateCall(gc) => {
@@ -242,7 +268,7 @@ fn extract_stmt(stmt: &asg::Stmt, table: &SymbolTable, ops: &mut Vec<Op>, summar
             ops.push(Op {
                 kind: "gate",
                 name,
-                operands: exprs_str(gc.qubits(), table),
+                operands: exprs_str_tracked(gc.qubits(), table, referenced),
                 params: gc.params().map(|p| exprs_str(p, table)).unwrap_or_default(),
             });
         }
@@ -261,7 +287,11 @@ fn extract_stmt(stmt: &asg::Stmt, table: &SymbolTable, ops: &mut Vec<Op>, summar
         Stmt::Reset(r) => ops.push(Op {
             kind: "reset",
             name: "reset".into(),
-            operands: expr_str(r.gate_operand(), table),
+            operands: {
+                let q = expr_str(r.gate_operand(), table);
+                referenced.insert(q.clone());
+                q
+            },
             params: String::new(),
         }),
         Stmt::Barrier(b) => ops.push(Op {
@@ -269,7 +299,7 @@ fn extract_stmt(stmt: &asg::Stmt, table: &SymbolTable, ops: &mut Vec<Op>, summar
             name: "barrier".into(),
             operands: b
                 .qubits()
-                .map(|q| exprs_str(q, table))
+                .map(|q| exprs_str_tracked(q, table, referenced))
                 .unwrap_or_else(|| "(all)".into()),
             params: String::new(),
         }),
@@ -281,11 +311,11 @@ fn extract_stmt(stmt: &asg::Stmt, table: &SymbolTable, ops: &mut Vec<Op>, summar
                 ops.push(Op {
                     kind: "measure",
                     name: "measure".into(),
-                    operands: format!(
-                        "{} -> {}",
-                        expr_str(me.operand(), table),
-                        lvalue_str(a.lvalue(), table)
-                    ),
+                    operands: {
+                        let q = expr_str(me.operand(), table);
+                        referenced.insert(q.clone());
+                        format!("{} -> {}", q, lvalue_str(a.lvalue(), table))
+                    },
                     params: String::new(),
                 });
             } else {
@@ -372,7 +402,7 @@ fn extract_stmt(stmt: &asg::Stmt, table: &SymbolTable, ops: &mut Vec<Op>, summar
                 summary.bits += bit_width(table[sid].symbol_type());
             }
         }
-        Stmt::AnnotatedStmt(a) => extract_stmt(a.statement(), table, ops, summary),
+        Stmt::AnnotatedStmt(a) => extract_stmt(a.statement(), table, ops, summary, referenced),
         // Declarations, includes, pragmas, io declarations: summary-only or
         // ignored; they do not participate in the executable stream.
         _ => {}
