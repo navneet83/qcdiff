@@ -1,8 +1,9 @@
 # qcdiff
 
-Semantic diff for OpenQASM 3 circuits: a fast, readable report of what changed
-between two quantum programs, at the operation level instead of the text
-level. Built for CI pipelines and code review.
+Semantic diff for OpenQASM 3 quantum circuits. `qcdiff` compares two QASM
+files at the gate level instead of the text level and prints a readable
+report of what changed: gates added, removed, or re-parameterized. Built for
+CI pipelines and code review of transpiler output.
 
 ```text
 $ qcdiff old.qasm new.qasm

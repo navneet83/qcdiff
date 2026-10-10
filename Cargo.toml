@@ -2,8 +2,12 @@
 name = "qcdiff"
 version = "0.1.0"
 edition = "2021"
-description = "Semantic diff for OpenQASM 3 circuits"
+description = "Command-line semantic diff for OpenQASM 3 quantum circuits: compare two QASM files at the gate level, for CI and code review"
 license = "Apache-2.0"
+repository = "https://github.com/navneet83/qcdiff"
+readme = "README.md"
+keywords = ["quantum", "qasm", "openqasm", "diff", "qiskit"]
+categories = ["command-line-utilities", "development-tools::testing", "science"]
 
 [dependencies]
 oq3_syntax = "0.7"
