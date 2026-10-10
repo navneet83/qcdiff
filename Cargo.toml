@@ -1,0 +1,17 @@
+[package]
+name = "qcdiff"
+version = "0.1.0"
+edition = "2021"
+description = "Semantic diff for OpenQASM 3 circuits"
+license = "Apache-2.0"
+
+[dependencies]
+oq3_syntax = "0.7"
+oq3_semantics = "0.7"
+similar = "2"
+clap = { version = "4", features = ["derive"] }
+anstyle = "1"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
