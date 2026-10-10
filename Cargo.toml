@@ -1,6 +1,6 @@
 [package]
 name = "qcdiff"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Command-line semantic diff for OpenQASM 3 quantum circuits: compare two QASM files at the gate level, for CI and code review"
 license = "Apache-2.0"
