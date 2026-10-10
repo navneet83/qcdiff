@@ -65,11 +65,7 @@ pub fn diff(a: &Extracted, b: &Extracted) -> DiffResult {
                         lines.push(DiffLine {
                             change: Change::Modified,
                             text: oa.render(),
-                            new_params: Some(if ob.params.is_empty() {
-                                "(none)".to_string()
-                            } else {
-                                ob.params.clone()
-                            }),
+                            new_params: Some(ob.params.clone()),
                         });
                     }
                 }

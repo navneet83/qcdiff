@@ -144,11 +144,10 @@ fn print_diff(result: &DiffResult, color: bool) {
             Change::Same => println!("{dim}  {}{reset}", line.text),
             Change::Removed => println!("{red}- {}{reset}", line.text),
             Change::Added => println!("{green}+ {}{reset}", line.text),
-            Change::Modified => println!(
-                "{yellow}~ {} => ({}){reset}",
-                line.text,
-                line.new_params.as_deref().unwrap_or("(none)")
-            ),
+            Change::Modified => match line.new_params.as_deref() {
+                Some("") | None => println!("{yellow}~ {} => none{reset}", line.text),
+                Some(np) => println!("{yellow}~ {} => ({np}){reset}", line.text),
+            },
         }
     }
 }

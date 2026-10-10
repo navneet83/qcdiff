@@ -117,3 +117,34 @@ fn missing_file_exits_two() {
         .assert()
         .code(2);
 }
+
+#[test]
+fn shifted_declaration_does_not_change_control_flow_hash() {
+    qcdiff()
+        .args([
+            fixture("ctrl_flow.qasm"),
+            fixture("ctrl_flow_shifted_decl.qasm"),
+        ])
+        .assert()
+        .code(0);
+}
+
+#[test]
+fn control_flow_body_edit_reports_as_modified() {
+    qcdiff()
+        .args([
+            fixture("ctrl_flow.qasm"),
+            fixture("ctrl_flow_body_edit.qasm"),
+        ])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("~ if"));
+}
+
+#[test]
+fn removed_params_render_as_none() {
+    qcdiff()
+        .args([fixture("param_change.qasm"), fixture("base.qasm")])
+        .assert()
+        .stdout(predicate::str::contains("((none))").not());
+}
