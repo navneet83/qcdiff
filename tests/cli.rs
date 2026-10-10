@@ -148,3 +148,38 @@ fn removed_params_render_as_none() {
         .assert()
         .stdout(predicate::str::contains("((none))").not());
 }
+
+// Golden fixtures: real `qiskit.transpile()` output (qiskit 2.5.2), committed
+// so the suite exercises physical-qubit operands, pi expressions, and
+// stdgates includes without needing Python. Regenerate with
+// dev/gen_qiskit_fixtures.py.
+fn golden(name: &str) -> String {
+    format!("tests/golden/{name}.qasm")
+}
+
+#[test]
+fn golden_same_transpile_seed_is_identical() {
+    qcdiff()
+        .args([golden("qft_det_a"), golden("qft_det_b")])
+        .assert()
+        .code(0);
+}
+
+#[test]
+fn golden_one_param_tweak_is_one_modification() {
+    qcdiff()
+        .args([golden("ansatz_a"), golden("ansatz_b")])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("+0 -0 ~1"));
+}
+
+#[test]
+fn golden_optimization_levels_diff_summarizes() {
+    qcdiff()
+        .args([golden("qft_o1"), golden("qft_o3")])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("2q-gates: 26 -> 20"))
+        .stdout(predicate::str::contains("+40 -48 ~6"));
+}
