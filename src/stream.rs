@@ -3,8 +3,8 @@
 //! non-executable statements contribute to summary counts only.
 
 use oq3_semantics::asg;
-use oq3_semantics::symbols::{SymbolIdResult, SymbolTable, SymbolType};
-use oq3_semantics::types::Type;
+use oq3_semantics::symbols::{SymbolId, SymbolIdResult, SymbolTable, SymbolType};
+use oq3_semantics::types::{IsConst, Type};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -58,11 +58,61 @@ pub struct Extracted {
 fn short_hash<T: Hash>(value: &T) -> String {
     let mut h = DefaultHasher::new();
     value.hash(&mut h);
-    format!("#{:08x}", h.finish() as u32)
+    format!("#{:016x}", h.finish())
 }
 
-fn hash_debug<T: std::fmt::Debug>(value: &T) -> String {
-    short_hash(&format!("{value:?}"))
+// Debug output embeds SymbolId numbers, which renumber when an unrelated
+// declaration moves, so resolve them to symbol names before hashing.
+fn hash_debug<T: std::fmt::Debug>(value: &T, table: &SymbolTable) -> String {
+    let names = symbol_names(table);
+    let raw = format!("{value:?}");
+    let mut out = String::with_capacity(raw.len());
+    let mut rest = raw.as_str();
+    const TAG: &str = "SymbolId(";
+    while let Some(pos) = rest.find(TAG) {
+        out.push_str(&rest[..pos]);
+        rest = &rest[pos + TAG.len()..];
+        let parsed = rest.find(')').and_then(|close| {
+            rest[..close]
+                .parse::<usize>()
+                .ok()
+                .filter(|n| *n < names.len())
+                .map(|n| (close, n))
+        });
+        match parsed {
+            Some((close, n)) => {
+                out.push_str("sym:");
+                out.push_str(&names[n]);
+                rest = &rest[close + 1..];
+            }
+            // Not a table id (e.g. literal text in a source string): keep as is.
+            None => out.push_str(TAG),
+        }
+    }
+    out.push_str(rest);
+    short_hash(&out)
+}
+
+// The table exposes no length and indexing out of range panics; a probe
+// binding on a clone returns the next SymbolId, which is the count.
+fn symbol_names(table: &SymbolTable) -> Vec<String> {
+    let count = table
+        .clone()
+        .new_binding("__qcdiff_count_probe", &Type::Bool(IsConst::False))
+        .map(|id| symbol_id_value(&id))
+        .unwrap_or(0);
+    let mut id = SymbolId::new();
+    (0..count)
+        .map(|_| table[&id.post_increment()].name().to_string())
+        .collect()
+}
+
+fn symbol_id_value(id: &SymbolId) -> usize {
+    format!("{id:?}")
+        .trim_start_matches("SymbolId(")
+        .trim_end_matches(')')
+        .parse()
+        .unwrap_or(0)
 }
 
 fn sym_name(id: &SymbolIdResult, table: &SymbolTable) -> String {
@@ -123,7 +173,7 @@ fn exprs_str_tracked(
 fn expr_str(texpr: &asg::TExpr, table: &SymbolTable) -> String {
     use asg::Expr;
     match texpr.expression() {
-        Expr::Literal(lit) => literal_str(lit),
+        Expr::Literal(lit) => literal_str(lit, table),
         Expr::Identifier(id) => sym_name(id, table),
         Expr::IndexedIdentifier(ii) => indexed_identifier_str(ii, table),
         Expr::GateOperand(go) => gate_operand_str(go, table),
@@ -141,19 +191,19 @@ fn expr_str(texpr: &asg::TExpr, table: &SymbolTable) -> String {
         Expr::MeasureExpression(me) => format!("measure {}", expr_str(me.operand(), table)),
         // IndexExpression exposes no field accessors in oq3_semantics 0.7,
         // so it participates as an opaque content hash.
-        Expr::IndexExpression(ie) => hash_debug(&ie),
+        Expr::IndexExpression(ie) => hash_debug(&ie, table),
         Expr::HardwareQubit(hq) => format!("${}", hq.identifier()),
-        other => hash_debug(&other),
+        other => hash_debug(&other, table),
     }
 }
 
-fn literal_str(lit: &asg::Literal) -> String {
+fn literal_str(lit: &asg::Literal, table: &SymbolTable) -> String {
     use asg::Literal as L;
     match lit {
         L::Int(i) => format!("{}{}", if *i.sign() { "" } else { "-" }, i.value()),
         L::Float(f) => f.value().to_string(),
         L::Bool(b) => format!("{:?}", b.value()),
-        other => hash_debug(&other),
+        other => hash_debug(&other, table),
     }
 }
 
@@ -351,31 +401,31 @@ fn extract_stmt(
             kind: "ctrl-flow",
             name: "if".into(),
             operands: expr_str(i.condition(), table),
-            params: hash_debug(&(i.then_branch(), i.else_branch())),
+            params: hash_debug(&(i.then_branch(), i.else_branch()), table),
         }),
         Stmt::While(w) => ops.push(Op {
             kind: "ctrl-flow",
             name: "while".into(),
             operands: expr_str(w.condition(), table),
-            params: hash_debug(&w.loop_body()),
+            params: hash_debug(&w.loop_body(), table),
         }),
         Stmt::ForStmt(f) => ops.push(Op {
             kind: "ctrl-flow",
             name: "for".into(),
             operands: sym_name(f.loop_var(), table),
-            params: hash_debug(&(f.iterable(), f.loop_body())),
+            params: hash_debug(&(f.iterable(), f.loop_body()), table),
         }),
         Stmt::SwitchCaseStmt(s) => ops.push(Op {
             kind: "ctrl-flow",
             name: "switch".into(),
             operands: String::new(),
-            params: hash_debug(&s),
+            params: hash_debug(&s, table),
         }),
         Stmt::Block(b) => ops.push(Op {
             kind: "ctrl-flow",
             name: "block".into(),
             operands: String::new(),
-            params: hash_debug(&b),
+            params: hash_debug(&b, table),
         }),
         Stmt::GateDefinition(gd) => {
             summary.gate_defs += 1;
@@ -383,14 +433,14 @@ fn extract_stmt(
                 kind: "gatedef",
                 name: sym_name(gd.name(), table),
                 operands: String::new(),
-                params: hash_debug(&gd),
+                params: hash_debug(&gd, table),
             });
         }
         Stmt::Delay(_) => ops.push(Op {
             kind: "delay",
             name: "delay".into(),
             operands: String::new(),
-            params: hash_debug(&stmt),
+            params: hash_debug(&stmt, table),
         }),
         Stmt::DeclareQuantum(d) => {
             if let Ok(sid) = d.name() {
