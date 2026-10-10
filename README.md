@@ -33,7 +33,7 @@ Textual diff is useless for circuits: equivalent programs serialize with differe
 ## Install
 
 ```sh
-cargo install --path .
+cargo install qcdiff
 ```
 
 ## Usage
