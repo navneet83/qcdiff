@@ -36,6 +36,19 @@ Textual diff is useless for circuits: equivalent programs serialize with differe
 cargo install qcdiff
 ```
 
+## Library
+
+The CLI is a thin wrapper over the [`qcdiff-core`](https://crates.io/crates/qcdiff-core) crate, so the extraction and diff machinery can be embedded in other tools:
+
+```rust
+use qcdiff_core::{diff, extract_source};
+
+let old = extract_source(&std::fs::read_to_string("old.qasm")?, Some("old.qasm"))?;
+let new = extract_source(&std::fs::read_to_string("new.qasm")?, Some("new.qasm"))?;
+let result = diff(&old, &new);
+println!("+{} -{} ~{}", result.added, result.removed, result.modified);
+```
+
 ## Usage
 
 ```sh

@@ -20,5 +20,5 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
-      - run: cargo install --path . --locked
-      - run: qcdiff tests/golden/qft_det_a.qasm tests/golden/qft_det_b.qasm
+      - run: cargo install --path crates/qcdiff --locked
+      - run: qcdiff crates/qcdiff/tests/golden/qft_det_a.qasm crates/qcdiff/tests/golden/qft_det_b.qasm

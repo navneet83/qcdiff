@@ -1,12 +1,8 @@
-mod diff;
-mod stream;
-
 use clap::Parser;
-use diff::{Change, DiffResult};
+use qcdiff_core::{diff, Change, DiffResult, Error, Extracted, Summary};
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use stream::{Extracted, Summary};
 
 /// Semantic diff for OpenQASM 3 circuits: reports what changed between two
 /// programs at the operation level, for CI and code review. Not an
@@ -44,7 +40,7 @@ fn main() -> ExitCode {
 
     print_summary(&cli.old, &old.summary, &cli.new, &new.summary);
 
-    let result = diff::diff(&old, &new);
+    let result = diff(&old, &new);
     println!(
         "ops: {} -> {} | +{} -{} ~{}",
         old.summary.total_ops, new.summary.total_ops, result.added, result.removed, result.modified
@@ -71,50 +67,24 @@ fn load(path: &Path) -> Result<Extracted, ExitCode> {
         }
     };
 
-    // Honest scope: OpenQASM 2 has different grammar and semantics.
-    if is_qasm2(&source) {
-        eprintln!(
-            "error: {} declares OPENQASM 2.0, which qcdiff does not support yet.\n\
-             Convert it to OpenQASM 3 first, e.g. in Python:\n\
-             qiskit.qasm3.dumps(qiskit.QuantumCircuit.from_qasm_file(\"{}\"))",
-            path.display(),
-            path.display()
-        );
-        return Err(ExitCode::from(EXIT_ERROR));
-    }
-
-    let search: Option<&[&str]> = None;
-    let parsed = oq3_semantics::syntax_to_semantics::parse_source_string(
-        source,
-        Some(path.to_string_lossy().as_ref()),
-        search,
-    );
-    if parsed.any_errors() {
-        eprintln!("error: {} has parse or semantic errors:", path.display());
-        parsed.print_errors();
-        return Err(ExitCode::from(EXIT_ERROR));
-    }
-
-    Ok(stream::extract(parsed.program(), parsed.symbol_table()))
-}
-
-/// True when the version statement declares major version 2. Decided on the
-/// parsed-out version line rather than substring search over the whole file.
-fn is_qasm2(source: &str) -> bool {
-    for line in source.lines() {
-        let t = line.trim();
-        if t.is_empty() || t.starts_with("//") {
-            continue;
+    match qcdiff_core::extract_source(&source, Some(path.to_string_lossy().as_ref())) {
+        Ok(x) => Ok(x),
+        Err(Error::Qasm2) => {
+            eprintln!(
+                "error: {} declares OPENQASM 2.0, which qcdiff does not support yet.\n\
+                 Convert it to OpenQASM 3 first, e.g. in Python:\n\
+                 qiskit.qasm3.dumps(qiskit.QuantumCircuit.from_qasm_file(\"{}\"))",
+                path.display(),
+                path.display()
+            );
+            Err(ExitCode::from(EXIT_ERROR))
         }
-        if let Some(rest) = t.strip_prefix("OPENQASM") {
-            let version = rest.trim_start().trim_end_matches(';').trim();
-            return version.starts_with('2');
+        Err(Error::Parse(errors)) => {
+            eprintln!("error: {} has parse or semantic errors:", path.display());
+            errors.print();
+            Err(ExitCode::from(EXIT_ERROR))
         }
-        // First effective statement is not a version declaration: OQ3 allows
-        // omitting it; treat as OQ3.
-        return false;
     }
-    false
 }
 
 fn print_summary(path_a: &Path, a: &Summary, path_b: &Path, b: &Summary) {

@@ -1,0 +1,15 @@
+[package]
+name = "qcdiff-core"
+version = "0.1.0"
+edition.workspace = true
+description = "Semantic diff for OpenQASM 3 quantum circuits: parse, normalize, and diff operation streams (library behind the qcdiff CLI)"
+license.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+keywords = ["quantum", "qasm", "openqasm", "diff", "qiskit"]
+categories = ["science", "development-tools::testing"]
+
+[dependencies]
+oq3_semantics = "0.7"
+oq3_source_file = "0.7"
+similar = "2"
