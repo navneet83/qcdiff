@@ -33,7 +33,16 @@ Textual diff is useless for circuits: equivalent programs serialize with differe
 ## Install
 
 ```sh
-cargo install qcdiff
+cargo install qcdiff    # CLI
+pip install qcdiff      # Python bindings
+```
+
+From Python:
+
+```python
+import qcdiff
+
+assert not qcdiff.diff_files("reference/ghz.qasm", "build/ghz.qasm")
 ```
 
 ## Library
