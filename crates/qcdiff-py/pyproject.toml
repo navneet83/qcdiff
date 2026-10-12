@@ -1,0 +1,26 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "qcdiff"
+description = "Semantic diff for OpenQASM 3 quantum circuits: compare two QASM programs at the gate level, for CI and code review"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+keywords = ["quantum", "qasm", "openqasm", "diff", "qiskit", "quantum-computing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Software Development :: Testing",
+]
+dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/navneet83/qcdiff"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]

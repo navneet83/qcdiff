@@ -22,3 +22,15 @@ jobs:
       - run: cargo test
       - run: cargo install --path crates/qcdiff --locked
       - run: qcdiff crates/qcdiff/tests/golden/qft_det_a.qasm crates/qcdiff/tests/golden/qft_det_b.qasm
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ./crates/qcdiff-py pytest
+      - run: pytest crates/qcdiff-py/tests/
