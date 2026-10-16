@@ -1,5 +1,7 @@
 # qcdiff
 
+[![Qiskit Ecosystem](https://qisk.it/e-77f33a45)](https://qisk.it/e)
+
 Semantic diff for OpenQASM 3 quantum circuits. `qcdiff` compares two QASM files at the gate level instead of the text level and prints a readable report of what changed: gates added, removed, or re-parameterized. Built for CI pipelines and code review of transpiler output.
 
 ```text
