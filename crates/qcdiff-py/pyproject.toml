@@ -7,6 +7,7 @@ name = "qcdiff"
 description = "Semantic diff for OpenQASM 3 quantum circuits: compare two QASM programs at the gate level, for CI and code review"
 readme = "README.md"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.9"
 keywords = ["quantum", "qasm", "openqasm", "diff", "qiskit", "quantum-computing"]
 classifiers = [

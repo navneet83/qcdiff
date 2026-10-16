@@ -58,9 +58,6 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      - uses: PyO3/maturin-action@v1
-        env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          command: upload
-          args: --non-interactive dist/*
+          password: ${{ secrets.PYPI_API_TOKEN }}
